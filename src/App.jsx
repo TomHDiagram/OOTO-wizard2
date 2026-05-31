@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 const TEAL = "#00B5AD";
 const BG = "#F0EFEB";
@@ -107,25 +107,11 @@ async function apiCall(sys, msg) {
   } catch { return null; }
 }
 
-const trunc = (s, n = 90) => s.length > n ? s.slice(0, n - 1) + "…" : s;
-
 function PhoneBlock({ t }) {
   return (
-    <div style={{ marginTop: 16, background: BG, borderRadius: 12, padding: "14px 18px", textAlign: "center" }}>
-      <p style={{ margin: "0 0 6px", fontSize: 14, color: "#666", lineHeight: 1.5 }}>{t.callUs}</p>
+    <div style={{ marginTop: 20, background: BG, borderRadius: 14, padding: "16px 20px", textAlign: "center" }}>
+      <p style={{ margin: "0 0 8px", fontSize: 14, color: "#666", lineHeight: 1.5 }}>{t.callUs}</p>
       <a href={`tel:${t.phone}`} style={{ fontSize: 17, fontWeight: 700, color: TEAL, textDecoration: "none" }}>{t.phone}</a>
-    </div>
-  );
-}
-
-function AnsweredStep({ question, answer }) {
-  return (
-    <div style={{ marginBottom: 18, animation: "fadeIn 0.25s ease-out" }}>
-      <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 7px", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{question}</p>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#e8f6f5", border: "1.5px solid #a8d8d6", borderRadius: 10, padding: "8px 14px", maxWidth: "100%" }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={TEAL} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#006f6b", wordBreak: "break-word" }}>{answer}</span>
-      </div>
     </div>
   );
 }
@@ -133,7 +119,7 @@ function AnsweredStep({ question, answer }) {
 function PrimaryBtn({ onClick, label, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      display: "block", width: "100%", padding: "14px 20px", marginBottom: 10,
+      display: "block", width: "100%", padding: "15px 20px", marginBottom: 10,
       borderRadius: 12, border: "none", background: disabled ? "#ccc" : TEAL,
       color: "#fff", fontSize: 16, fontWeight: 700, cursor: disabled ? "default" : "pointer", fontFamily: "inherit",
     }}>{label}</button>
@@ -143,7 +129,7 @@ function PrimaryBtn({ onClick, label, disabled }) {
 function SecondaryBtn({ onClick, label }) {
   return (
     <button onClick={onClick} style={{
-      display: "block", width: "100%", padding: "14px 20px", marginBottom: 10,
+      display: "block", width: "100%", padding: "15px 20px", marginBottom: 10,
       borderRadius: 12, border: "1.5px solid #ddd", background: "#fff",
       color: "#333", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
     }}>{label}</button>
@@ -153,7 +139,7 @@ function SecondaryBtn({ onClick, label }) {
 function OptionBtn({ onClick, label }) {
   return (
     <button onClick={onClick} style={{
-      display: "block", width: "100%", padding: "13px 16px", marginBottom: 10,
+      display: "block", width: "100%", padding: "14px 18px", marginBottom: 10,
       borderRadius: 12, border: "1.5px solid #ddd", background: "#fff",
       color: "#333", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
     }}>{label}</button>
@@ -162,8 +148,8 @@ function OptionBtn({ onClick, label }) {
 
 export default function App() {
   const [lang, setLang] = useState("en");
-  const [history, setHistory] = useState([]);
   const [screen, setScreen] = useState("1");
+  const [transitioning, setTransitioning] = useState(false);
   const [org, setOrg] = useState("");
   const [orgInput, setOrgInput] = useState("");
   const [scenarioInput, setScenarioInput] = useState("");
@@ -171,21 +157,16 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [orgResult, setOrgResult] = useState(null);
   const [scenarioResult, setScenarioResult] = useState(null);
-  const bottomRef = useRef(null);
   const t = T[lang];
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [history.length, screen]);
-
-  const push = (question, answer, nextScreen) => {
-    setHistory(h => [...h, { question, answer }]);
-    setScreen(nextScreen);
+  const go = s => {
+    setTransitioning(true);
+    setTimeout(() => { setScreen(s); setTransitioning(false); }, 180);
   };
 
   const reset = () => {
-    setHistory([]); setScreen("1"); setOrg(""); setOrgInput("");
-    setScenarioInput(""); setCustomOutcome(""); setOrgResult(null); setScenarioResult(null);
+    go("1"); setOrg(""); setOrgInput(""); setScenarioInput("");
+    setCustomOutcome(""); setOrgResult(null); setScenarioResult(null);
   };
 
   const handleOrg = async () => {
@@ -193,7 +174,7 @@ export default function App() {
     setLoading(true);
     const r = await apiCall(ORG_PROMPT, `Organisation: ${orgInput.trim()}`);
     setOrgResult(r); setOrg(orgInput.trim()); setLoading(false);
-    push(t.s1q, orgInput.trim(), !r || r.inJurisdiction !== true ? "2b" : "2");
+    go(!r || r.inJurisdiction !== true ? "2b" : "2");
   };
 
   const handleScenario = async () => {
@@ -201,100 +182,107 @@ export default function App() {
     setLoading(true);
     const r = await apiCall(SCENARIO_PROMPT, `Organisation: ${org}\nScenario: ${scenarioInput.trim()}`);
     setScenarioResult(r); setLoading(false);
-    const ans = trunc(scenarioInput.trim());
     if (!r || r.canInvestigate === "uncertain" || ["children","urgent","complex","callPhone"].includes(r?.specialHandling)) {
-      push(t.s2q(org), ans, "call");
+      go("call");
     } else if (r.canInvestigate === false) {
-      push(t.s2q(org), ans, "3b");
+      go("3b");
     } else if (r.skipPriorComplaint) {
-      push(t.s2q(org), ans, "4");
+      go("4");
     } else {
-      push(t.s2q(org), ans, "3");
+      go("3");
     }
   };
 
-  const inp = { width: "100%", padding: "13px 15px", borderRadius: 12, border: "1.5px solid #ddd", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box", marginBottom: 12, display: "block" };
+  const inp = {
+    width: "100%", padding: "14px 16px", borderRadius: 12, border: "1.5px solid #ddd",
+    fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box", marginBottom: 14, display: "block",
+  };
 
-  const isTerminal = ["2b","3b","call","4b","5b","7"].includes(screen);
+  const screens = {
+    "1": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 20, lineHeight: 1.3 }}>{t.s1q}</p>
+      <input value={orgInput} onChange={e => setOrgInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOrg()} placeholder={t.s1ph} style={inp} autoFocus />
+      <PrimaryBtn onClick={handleOrg} label={t.next} disabled={!orgInput.trim()} />
+    </>,
 
-  const activeContent = () => {
-    switch (screen) {
-      case "1": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 14, lineHeight: 1.35 }}>{t.s1q}</p>
-        <input value={orgInput} onChange={e => setOrgInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleOrg()} placeholder={t.s1ph} style={inp} autoFocus />
-        <PrimaryBtn onClick={handleOrg} label={t.next} disabled={!orgInput.trim()} />
-      </>;
-      case "2": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 14, lineHeight: 1.35 }}>{t.s2q(org)}</p>
-        <textarea value={scenarioInput} onChange={e => setScenarioInput(e.target.value)} placeholder={t.s2ph} rows={4} style={{ ...inp, resize: "vertical" }} autoFocus />
-        <PrimaryBtn onClick={handleScenario} label={t.next} disabled={!scenarioInput.trim()} />
-      </>;
-      case "2b": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#c0392b", marginBottom: 12, lineHeight: 1.35 }}>{t.s2bTitle}</p>
-        {orgResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 8 }}>{orgResult.reason}</p>}
-        {orgResult?.alternative && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{orgResult.alternative}</p>}
-        <PhoneBlock t={t} />
-      </>;
-      case "3": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 18, lineHeight: 1.35 }}>{t.s3q(org)}</p>
-        <PrimaryBtn onClick={() => push(t.s3q(org), t.yes, "4")} label={t.yes} />
-        <SecondaryBtn onClick={() => push(t.s3q(org), t.no, "4b")} label={t.no} />
-      </>;
-      case "3b": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#c0392b", marginBottom: 12, lineHeight: 1.35 }}>{t.s3bTitle}</p>
-        {scenarioResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 8 }}>{scenarioResult.reason}</p>}
-        {scenarioResult?.alternative && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{scenarioResult.alternative}</p>}
-        <PhoneBlock t={t} />
-      </>;
-      case "call": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 12, lineHeight: 1.35 }}>{t.callTitle}</p>
-        <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 8 }}>{t.callMsg}</p>
-        {scenarioResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{scenarioResult.reason}</p>}
-        <PhoneBlock t={t} />
-      </>;
-      case "4": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 18, lineHeight: 1.35 }}>{t.s4q(org)}</p>
-        <PrimaryBtn onClick={() => push(t.s4q(org), t.yes, "5")} label={t.yes} />
-        <SecondaryBtn onClick={() => push(t.s4q(org), t.no, scenarioResult?.skipPriorComplaint ? "5" : "5b")} label={t.no} />
-      </>;
-      case "4b": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#c0392b", marginBottom: 12, lineHeight: 1.35 }}>{t.s4bTitle}</p>
-        <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 8 }}>{t.s4bMsg(org)}</p>
-        <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{t.s4bAdv(org)}</p>
-        <PhoneBlock t={t} />
-      </>;
-      case "5": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 14, lineHeight: 1.35 }}>{t.s5q}</p>
-        {t.s5opts.map((opt, i) => (
-          <OptionBtn key={i} onClick={() => push(t.s5q, opt, i === t.s5opts.length - 1 ? "6b" : "6")} label={opt} />
-        ))}
-      </>;
-      case "5b": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#c0392b", marginBottom: 12, lineHeight: 1.35 }}>{t.s5bTitle}</p>
-        <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 8 }}>{t.s5bMsg(org)}</p>
-        <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{t.s5bAdv(org)}</p>
-        <PhoneBlock t={t} />
-      </>;
-      case "6b": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 14, lineHeight: 1.35 }}>{t.s6bq}</p>
-        <textarea value={customOutcome} onChange={e => setCustomOutcome(e.target.value)} placeholder={t.s6bph} rows={3} style={{ ...inp, resize: "vertical" }} autoFocus />
-        <PrimaryBtn onClick={() => push(t.s6bq, trunc(customOutcome), "6")} label={t.next} disabled={!customOutcome.trim()} />
-      </>;
-      case "6": return <>
-        <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 10, lineHeight: 1.35 }}>{t.s6q}</p>
-        <p style={{ fontSize: 15, color: "#555", lineHeight: 1.65, marginBottom: 18 }}>{t.s6info(org)}</p>
-        <PrimaryBtn onClick={() => { window.open(t.complaintUrl, "_blank"); push(t.s6q, t.makeComplaint, "7"); }} label={t.makeComplaint} />
-        <SecondaryBtn onClick={() => push(t.s6q, t.noThanks, "7")} label={t.noThanks} />
-      </>;
-      case "7": return (
-        <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <div style={{ fontSize: 48, marginBottom: 14 }}>👋</div>
-          <p style={{ fontSize: 20, fontWeight: 700, color: "#222", lineHeight: 1.3, marginBottom: 16 }}>{t.s7msg}</p>
-          <PhoneBlock t={t} />
-        </div>
-      );
-      default: return null;
-    }
+    "2": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 20, lineHeight: 1.3 }}>{t.s2q(org)}</p>
+      <textarea value={scenarioInput} onChange={e => setScenarioInput(e.target.value)} placeholder={t.s2ph} rows={4} style={{ ...inp, resize: "vertical" }} autoFocus />
+      <PrimaryBtn onClick={handleScenario} label={t.next} disabled={!scenarioInput.trim()} />
+    </>,
+
+    "2b": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#c0392b", marginBottom: 16, lineHeight: 1.3 }}>{t.s2bTitle}</p>
+      {orgResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 10 }}>{orgResult.reason}</p>}
+      {orgResult?.alternative && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{orgResult.alternative}</p>}
+      <PhoneBlock t={t} />
+    </>,
+
+    "3": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 28, lineHeight: 1.3 }}>{t.s3q(org)}</p>
+      <PrimaryBtn onClick={() => go("4")} label={t.yes} />
+      <SecondaryBtn onClick={() => go("4b")} label={t.no} />
+    </>,
+
+    "3b": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#c0392b", marginBottom: 16, lineHeight: 1.3 }}>{t.s3bTitle}</p>
+      {scenarioResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 10 }}>{scenarioResult.reason}</p>}
+      {scenarioResult?.alternative && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{scenarioResult.alternative}</p>}
+      <PhoneBlock t={t} />
+    </>,
+
+    "call": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 16, lineHeight: 1.3 }}>{t.callTitle}</p>
+      <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 10 }}>{t.callMsg}</p>
+      {scenarioResult?.reason && <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{scenarioResult.reason}</p>}
+      <PhoneBlock t={t} />
+    </>,
+
+    "4": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 28, lineHeight: 1.3 }}>{t.s4q(org)}</p>
+      <PrimaryBtn onClick={() => go("5")} label={t.yes} />
+      <SecondaryBtn onClick={() => go(scenarioResult?.skipPriorComplaint ? "5" : "5b")} label={t.no} />
+    </>,
+
+    "4b": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#c0392b", marginBottom: 16, lineHeight: 1.3 }}>{t.s4bTitle}</p>
+      <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 10 }}>{t.s4bMsg(org)}</p>
+      <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{t.s4bAdv(org)}</p>
+      <PhoneBlock t={t} />
+    </>,
+
+    "5": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 20, lineHeight: 1.3 }}>{t.s5q}</p>
+      {t.s5opts.map((opt, i) => (
+        <OptionBtn key={i} onClick={() => go(i === t.s5opts.length - 1 ? "6b" : "6")} label={opt} />
+      ))}
+    </>,
+
+    "5b": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#c0392b", marginBottom: 16, lineHeight: 1.3 }}>{t.s5bTitle}</p>
+      <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65, marginBottom: 10 }}>{t.s5bMsg(org)}</p>
+      <p style={{ fontSize: 15, color: "#444", lineHeight: 1.65 }}>{t.s5bAdv(org)}</p>
+      <PhoneBlock t={t} />
+    </>,
+
+    "6b": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 16, lineHeight: 1.3 }}>{t.s6bq}</p>
+      <textarea value={customOutcome} onChange={e => setCustomOutcome(e.target.value)} placeholder={t.s6bph} rows={4} style={{ ...inp, resize: "vertical" }} autoFocus />
+      <PrimaryBtn onClick={() => go("6")} label={t.next} disabled={!customOutcome.trim()} />
+    </>,
+
+    "6": <>
+      <p style={{ fontSize: 21, fontWeight: 700, color: "#222", marginBottom: 12, lineHeight: 1.3 }}>{t.s6q}</p>
+      <p style={{ fontSize: 15, color: "#555", lineHeight: 1.65, marginBottom: 24 }}>{t.s6info(org)}</p>
+      <PrimaryBtn onClick={() => window.open(t.complaintUrl, "_blank")} label={t.makeComplaint} />
+      <SecondaryBtn onClick={() => go("7")} label={t.noThanks} />
+    </>,
+
+    "7": <div style={{ textAlign: "center", padding: "16px 0" }}>
+      <div style={{ fontSize: 52, marginBottom: 16 }}>👋</div>
+      <p style={{ fontSize: 20, fontWeight: 700, color: "#222", marginBottom: 16, lineHeight: 1.3 }}>{t.s7msg}</p>
+      <PhoneBlock t={t} />
+    </div>,
   };
 
   return (
@@ -319,9 +307,9 @@ export default function App() {
       </div>
 
       {/* Intro — screen 1 only */}
-      {screen === "1" && history.length === 0 && (
-        <div style={{ background: "#fff", padding: "16px 20px", borderBottom: "1px solid #e4e0d8" }}>
-          <p style={{ fontSize: 15, color: "#333", fontWeight: 500, margin: "0 0 4px", lineHeight: 1.5 }}>{t.tagline}</p>
+      {screen === "1" && (
+        <div style={{ background: "#fff", padding: "18px 20px", borderBottom: "1px solid #e4e0d8" }}>
+          <p style={{ fontSize: 15, color: "#333", fontWeight: 500, margin: "0 0 5px", lineHeight: 1.5 }}>{t.tagline}</p>
           <p style={{ fontSize: 14, color: "#777", margin: 0, lineHeight: 1.5 }}>{t.subtitle}</p>
         </div>
       )}
@@ -335,30 +323,12 @@ export default function App() {
       )}
 
       {/* Card */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "20px 16px 40px" }}>
-        <div style={{ width: "100%", maxWidth: 520, background: "#fff", borderRadius: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", padding: "24px 22px" }}>
-
-          {/* Answered history */}
-          {history.length > 0 && (
-            <div style={{ marginBottom: 4 }}>
-              {history.map((item, i) => (
-                <AnsweredStep key={i} question={item.question} answer={item.answer} />
-              ))}
-              {!isTerminal && (
-                <div style={{ height: 2, background: `linear-gradient(to right, ${TEAL}, transparent)`, borderRadius: 2, marginBottom: 22, opacity: 0.35 }} />
-              )}
-            </div>
-          )}
-
-          {/* Active content */}
-          <div key={screen} style={{ animation: "fadeIn 0.22s ease-out" }}>
-            {activeContent()}
+      <div style={{ display: "flex", justifyContent: "center", padding: "24px 16px 40px" }}>
+        <div style={{ width: "100%", maxWidth: 520, background: "#fff", borderRadius: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", padding: "28px 24px" }}>
+          <div key={screen} style={{ animation: transitioning ? "fadeOut 0.15s ease-out forwards" : "fadeIn 0.2s ease-out" }}>
+            {screens[screen]}
           </div>
-
-          <div ref={bottomRef} />
-
-          {/* Nav */}
-          <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button onClick={reset} style={{ flex: 1, padding: "10px 8px", background: "none", border: "1.5px solid #ddd", borderRadius: 10, fontSize: 13, cursor: "pointer", color: "#666", fontFamily: "inherit", fontWeight: 500 }}>
               ↺ {t.startAgain}
             </button>
@@ -371,7 +341,8 @@ export default function App() {
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
         * { box-sizing: border-box; }
       `}</style>
     </div>
